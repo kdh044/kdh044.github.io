@@ -1,2 +1,43 @@
+import { createRouter } from './lib/router.js';
+import { renderSidebar, renderMobileHeader, attachSidebarHandlers } from './components/sidebar.js';
+import { storage } from './lib/storage.js';
+
 const app = document.getElementById('app');
-app.textContent = 'kdh044 planner — bootstrapping...';
+
+function renderShell(pageHtml, pageTitle) {
+  const hash = window.location.hash;
+  app.innerHTML = `
+    ${renderMobileHeader(pageTitle)}
+    <div class="app-shell">
+      ${renderSidebar(hash)}
+      <main class="main">${pageHtml}</main>
+    </div>
+  `;
+  attachSidebarHandlers();
+}
+
+function pageWeek() {
+  renderShell('<h1 class="page-title">Week</h1><p class="page-subtitle">주간 grid (Task 12에서 구현)</p>', 'Week');
+}
+function pageToday() {
+  renderShell('<h1 class="page-title">Today</h1><p class="page-subtitle">(Task 11에서 구현)</p>', 'Today');
+}
+function pageRoutines() {
+  renderShell('<h1 class="page-title">Routines</h1><p class="page-subtitle">(Task 10에서 구현)</p>', 'Routines');
+}
+function pageSettings() {
+  renderShell('<h1 class="page-title">Settings</h1><p class="page-subtitle">(Task 9에서 구현)</p>', 'Settings');
+}
+
+const router = createRouter({
+  '/': pageWeek,
+  '/today': pageToday,
+  '/routines': pageRoutines,
+  '/settings': pageSettings,
+});
+
+if (!storage.get('pat') && window.location.hash !== '#/settings') {
+  window.location.hash = '#/settings';
+}
+
+router.start();
