@@ -1,6 +1,7 @@
 import { createRouter } from './lib/router.js';
 import { renderSidebar, renderMobileHeader, attachSidebarHandlers } from './components/sidebar.js';
 import { storage } from './lib/storage.js';
+import { renderSettings } from './pages/settings.js';
 
 const app = document.getElementById('app');
 
@@ -26,7 +27,9 @@ function pageRoutines() {
   renderShell('<h1 class="page-title">Routines</h1><p class="page-subtitle">(Task 10에서 구현)</p>', 'Routines');
 }
 function pageSettings() {
-  renderShell('<h1 class="page-title">Settings</h1><p class="page-subtitle">(Task 9에서 구현)</p>', 'Settings');
+  renderShell('', 'Settings');
+  const main = document.querySelector('.main');
+  renderSettings(main);
 }
 
 const router = createRouter({
