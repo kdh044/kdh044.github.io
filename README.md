@@ -17,7 +17,7 @@ npm run build    # dist/ 생성
 
 ## 데이터
 
-데이터는 별도 private repo `kdh044/grad-planner-data`에 저장됨.
+데이터는 별도 private repo `kdh044/private`에 저장됨.
 첫 진입 시 Settings에서 fine-grained PAT 입력 필요 (해당 repo `Contents: Read and write` 권한).
 
 ## Tech

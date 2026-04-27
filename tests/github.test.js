@@ -5,7 +5,7 @@ describe('GitHubClient', () => {
   let client;
 
   beforeEach(() => {
-    client = new GitHubClient({ token: 'tok', owner: 'kdh044', repo: 'grad-planner-data' });
+    client = new GitHubClient({ token: 'tok', owner: 'kdh044', repo: 'private' });
     global.fetch = vi.fn();
   });
 
@@ -39,7 +39,7 @@ describe('GitHubClient', () => {
     const newSha = await client.writeFile('settings.json', { a: 2 }, 'old_sha', 'feat: update settings');
     expect(newSha).toBe('new_sha');
     const call = fetch.mock.calls[0];
-    expect(call[0]).toContain('/repos/kdh044/grad-planner-data/contents/settings.json');
+    expect(call[0]).toContain('/repos/kdh044/private/contents/settings.json');
     expect(call[1].method).toBe('PUT');
     const body = JSON.parse(call[1].body);
     expect(body.sha).toBe('old_sha');

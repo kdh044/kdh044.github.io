@@ -7,7 +7,7 @@ import dayjs from 'dayjs';
 function getDataLayer() {
   const token = storage.get('pat');
   if (!token) return null;
-  return new DataLayer(new GitHubClient({ token, owner: 'kdh044', repo: 'grad-planner-data' }));
+  return new DataLayer(new GitHubClient({ token, owner: 'kdh044', repo: 'private' }));
 }
 
 function applies(routine, dateStr) {

@@ -15,7 +15,7 @@ function makeId() {
 function getDataLayer() {
   const token = storage.get('pat');
   if (!token) return null;
-  const client = new GitHubClient({ token, owner: 'kdh044', repo: 'grad-planner-data' });
+  const client = new GitHubClient({ token, owner: 'kdh044', repo: 'private' });
   return new DataLayer(client);
 }
 
