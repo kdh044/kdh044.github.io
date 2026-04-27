@@ -4,6 +4,7 @@ import { storage } from './lib/storage.js';
 import { renderSettings } from './pages/settings.js';
 import { renderRoutines } from './pages/routines.js';
 import { renderToday } from './pages/today.js';
+import { renderWeek } from './pages/week.js';
 
 const app = document.getElementById('app');
 
@@ -20,7 +21,9 @@ function renderShell(pageHtml, pageTitle) {
 }
 
 function pageWeek() {
-  renderShell('<h1 class="page-title">Week</h1><p class="page-subtitle">주간 grid (Task 12에서 구현)</p>', 'Week');
+  renderShell('', 'Week');
+  const main = document.querySelector('.main');
+  renderWeek(main);
 }
 function pageToday() {
   renderShell('', 'Today');

@@ -78,4 +78,5 @@ input:focus, textarea:focus { border-color: var(--accent); }
   .mobile-header { display: flex; }
   .main { padding: 20px 16px; }
   h1.page-title { font-size: 24px; }
+  .week-grid { grid-template-columns: 1fr !important; }
 }
