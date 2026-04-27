@@ -3,6 +3,7 @@ import { renderSidebar, renderMobileHeader, attachSidebarHandlers } from './comp
 import { storage } from './lib/storage.js';
 import { renderSettings } from './pages/settings.js';
 import { renderRoutines } from './pages/routines.js';
+import { renderToday } from './pages/today.js';
 
 const app = document.getElementById('app');
 
@@ -22,7 +23,9 @@ function pageWeek() {
   renderShell('<h1 class="page-title">Week</h1><p class="page-subtitle">주간 grid (Task 12에서 구현)</p>', 'Week');
 }
 function pageToday() {
-  renderShell('<h1 class="page-title">Today</h1><p class="page-subtitle">(Task 11에서 구현)</p>', 'Today');
+  renderShell('', 'Today');
+  const main = document.querySelector('.main');
+  renderToday(main);
 }
 function pageRoutines() {
   renderShell('', 'Routines');
