@@ -53,7 +53,17 @@ export class DataLayer {
       const { data } = await this._readCached('routines.json');
       return data;
     } catch (err) {
-      if (err instanceof NotFoundError) return { routines: [] };
+      if (err instanceof NotFoundError) {
+        const defaults = {
+          routines: [
+            { id: 'r_exercise', name: '운동',  kind: 'scheduled', time: '07:00', days: ['mon','tue','wed','thu','fri'], emoji: '🏃', color: '#ff6f00', active: true },
+            { id: 'r_english',  name: '영어 30min', kind: 'checklist', days: [], emoji: '📖', color: '#2196f3', active: true },
+            { id: 'r_meditate', name: '명상',  kind: 'scheduled', time: '22:00', days: [], emoji: '🧘', color: '#4caf50', active: true },
+          ],
+        };
+        try { await this._writeCached('routines.json', defaults, 'feat: init default routines'); } catch (_) {}
+        return defaults;
+      }
       throw err;
     }
   }

@@ -53,11 +53,13 @@ describe('DataLayer', () => {
     );
   });
 
-  it('getRoutines returns empty list on NotFound', async () => {
+  it('getRoutines seeds defaults on NotFound', async () => {
     const { NotFoundError } = await import('../src/lib/github.js');
     client.readFile.mockRejectedValueOnce(new NotFoundError('routines.json'));
+    client.writeFile.mockResolvedValueOnce('sha1');
     const result = await data.getRoutines();
-    expect(result).toEqual({ routines: [] });
+    expect(result.routines.length).toBe(3);
+    expect(result.routines.map(r => r.id)).toContain('r_exercise');
   });
 
   it('getCompletions reads month file', async () => {

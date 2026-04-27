@@ -2,6 +2,7 @@ import { createRouter } from './lib/router.js';
 import { renderSidebar, renderMobileHeader, attachSidebarHandlers } from './components/sidebar.js';
 import { storage } from './lib/storage.js';
 import { renderSettings } from './pages/settings.js';
+import { renderRoutines } from './pages/routines.js';
 
 const app = document.getElementById('app');
 
@@ -24,7 +25,9 @@ function pageToday() {
   renderShell('<h1 class="page-title">Today</h1><p class="page-subtitle">(Task 11에서 구현)</p>', 'Today');
 }
 function pageRoutines() {
-  renderShell('<h1 class="page-title">Routines</h1><p class="page-subtitle">(Task 10에서 구현)</p>', 'Routines');
+  renderShell('', 'Routines');
+  const main = document.querySelector('.main');
+  renderRoutines(main);
 }
 function pageSettings() {
   renderShell('', 'Settings');
