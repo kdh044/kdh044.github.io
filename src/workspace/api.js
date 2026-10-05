@@ -27,14 +27,23 @@ export class Backend {
   async save(content){const revision=this.revision+1;const rows=await this.request(`/rest/v1/workspaces${this.exists?`?owner_id=eq.${this.config.owner}&revision=eq.${this.revision}`:''}`,{method:this.exists?'PATCH':'POST',body:this.exists?{content,revision}:{owner_id:this.config.owner,content,revision},headers:{Prefer:'return=representation'}});if(!rows?.length)throw Error('다른 기기에서 변경되었습니다. 백업을 내보낸 후 새로고침해주세요.');this.exists=true;this.revision=revision;}
   async publish(content){await this.request('/rest/v1/portfolio?on_conflict=id',{method:'POST',body:{id:'main',owner_id:this.config.owner,content},headers:{Prefer:'resolution=merge-duplicates'}});}
 }
-let googleToken=null,googleExpiry=0;
+let googleToken=null,googleExpiry=0,googleLoader=null;
 export const googleConnected=()=>Boolean(googleToken&&googleExpiry>Date.now());
 export function clearGoogle(){if(googleToken&&window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(googleToken,()=>{});googleToken=null;googleExpiry=0;}
+export function prepareGoogle(){
+  if(window.google?.accounts?.oauth2)return Promise.resolve();
+  if(!googleLoader)googleLoader=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;
+    const timer=setTimeout(()=>{s.remove();googleLoader=null;reject(Error('Google 로그인 도구를 불러오지 못했습니다. 다시 연결해주세요.'));},15000);
+    s.onload=()=>{clearTimeout(timer);if(window.google?.accounts?.oauth2)resolve();else{googleLoader=null;reject(Error('Google 로그인 도구를 확인할 수 없습니다.'));}};
+    s.onerror=()=>{clearTimeout(timer);s.remove();googleLoader=null;reject(Error('Google 로그인 도구를 불러오지 못했습니다.'));};document.head.append(s);
+  });return googleLoader;
+}
 export async function connectGoogle(clientId){
   if(!clientId)throw Error('설정에서 Google OAuth Client ID를 입력해주세요.');
-  if(!window.google?.accounts?.oauth2)await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(Error('Google 로그인 도구를 불러오지 못했습니다.'));document.head.append(s);});
+  if(!window.google?.accounts?.oauth2)await prepareGoogle();
   await new Promise((resolve,reject)=>{const client=window.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:'https://www.googleapis.com/auth/calendar.events',callback:r=>{if(r.error){reject(Error('Google 캘린더 연결이 취소되었습니다.'));return;}googleToken=r.access_token;googleExpiry=Date.now()+r.expires_in*1000;resolve();},error_callback:()=>reject(Error('Google 로그인 창이 닫혔습니다.'))});client.requestAccessToken({prompt:googleToken?'':'consent'});});
 }
-async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok)throw Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');return v;}
-export async function listGoogleEvents(month){const start=new Date(month.getFullYear(),month.getMonth(),1),end=new Date(month.getFullYear(),month.getMonth()+1,1);let events=[],next;do{const p=new URLSearchParams({timeMin:start.toISOString(),timeMax:end.toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'2500',...(next?{pageToken:next}:{})});const r=await googleRequest('/calendars/primary/events?'+p);events.push(...(r.items||[]));next=r.nextPageToken;}while(next);return events.filter(x=>x.status!=='cancelled');}
+async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok){if(res.status===401){googleToken=null;googleExpiry=0;throw Error('Google 연결이 만료되었습니다. 다시 연결해주세요.');}throw Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');}return v;}
+export async function listGoogleEvents(month,range){const start=range?.start||new Date(month.getFullYear(),month.getMonth(),1),end=range?.end||new Date(month.getFullYear(),month.getMonth()+1,1);let events=[],next;do{const p=new URLSearchParams({timeMin:start.toISOString(),timeMax:end.toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'2500',...(next?{pageToken:next}:{})});const r=await googleRequest('/calendars/primary/events?'+p);events.push(...(r.items||[]));next=r.nextPageToken;}while(next);return events.filter(x=>x.status!=='cancelled');}
 export async function addGoogleEvent(e){const next=new Date(e.date+'T12:00:00');next.setDate(next.getDate()+1);return googleRequest('/calendars/primary/events',{method:'POST',body:JSON.stringify({summary:e.title,description:e.description||'',start:e.time?{dateTime:new Date(e.date+'T'+e.time).toISOString()}:{date:e.date},end:e.time?{dateTime:new Date(new Date(e.date+'T'+e.time).getTime()+60*60*1000).toISOString()}:{date:next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0')+'-'+String(next.getDate()).padStart(2,'0')}})});}
