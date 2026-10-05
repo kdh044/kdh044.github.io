@@ -1,11 +1,21 @@
-# 처음 한 번 연결하기
+# 연결 상태와 설정 안내
+
+현재 사이트의 Supabase 연결은 완료됐습니다. 기존 프로젝트에서 아래 계정 생성·SQL 적용을 다시 할 필요는 없습니다.
+
+- GitHub Pages에 프로젝트 URL, publishable 키, 본인 계정 이메일·UID를 반영했습니다. 이메일·UID 공개는 소유자가 허용했습니다. 비밀번호는 저장소에 저장하지 않습니다.
+- 소유자 계정을 등록하고 플래너 RLS를 적용했으며 신규 회원가입을 비활성화했습니다.
+- 배포 사이트에서 비밀번호 로그인, 현재 분류 저장, 새로고침 후 세션 복원과 DB 저장을 확인했습니다. 할 일·프로젝트·페이지는 모두 비어 있습니다.
+- 비로그인 API 요청은 플래너 읽기가 거부됐고 공개 포트폴리오 조회는 정상입니다. 다른 사용자 UID를 사용한 DB 권한 검사에서도 플래너 행이 보이지 않았습니다.
+- Google Calendar OAuth Client ID는 아직 연결하지 않았습니다.
+
+아래 Supabase 절차는 새 프로젝트로 옮기거나 연결을 다시 구성할 때의 참고용입니다.
 
 사이트 화면은 GitHub Pages에 배포됩니다. 플래너 데이터는 Supabase에만 저장되고, 로그인 전에는 읽지 않습니다. 예시 내용이나 기본 할 일은 만들지 않습니다.
 
 ## 1. Supabase 비밀번호 계정
 
 1. [Supabase](https://supabase.com/dashboard)에서 프로젝트를 만듭니다.
-2. Authentication → Users → Add user에서 본인 이메일과 원하는 비밀번호로 계정을 만듭니다. 이 사이트에는 회원가입 버튼이 없습니다.
+2. Authentication → Users → Add user → Create new user에서 본인 이메일과 원하는 비밀번호로 계정을 만듭니다. 이 사이트에는 회원가입 버튼이 없습니다.
 3. Authentication 설정에서 신규 가입을 비활성화합니다.
 4. 생성된 사용자의 UID를 복사합니다.
 5. [supabase/workspace-schema.sql](supabase/workspace-schema.sql)의 `00000000-0000-0000-0000-000000000000`를 그 UID로 바꿉니다. SQL Editor에서 전체 SQL을 실행합니다. 이 단계 전에는 로그인을 해도 저장할 수 없습니다.
