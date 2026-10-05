@@ -1,6 +1,6 @@
 import './style.css';
 import {uid,escape as esc,dateKey,emptyWorkspace,emptyPortfolio,safeURL,monthCells,weekCells,moveItem,eventOnDay,normalizeWorkspace} from './workspace/model.js';
-import {Backend,readConfig,writeConfig,configured,prepareGoogle,connectGoogle,clearGoogle,googleConnected,listGoogleEvents,addGoogleEvent} from './workspace/api.js';
+import {Backend,readConfig,mergeConfig,writeConfig,configured,prepareGoogle,connectGoogle,clearGoogle,googleConnected,listGoogleEvents,addGoogleEvent} from './workspace/api.js';
 
 const app=document.querySelector('#app'),modalRoot=document.querySelector('#modal-root');
 let config={},backend,workspace=emptyWorkspace(),portfolio=emptyPortfolio(),ready=false,loading=false;
@@ -164,7 +164,7 @@ window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.return
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'&&ready){e.preventDefault();flushSave().catch(()=>{});}});
 async function init(){
   let shared={};try{shared=await fetch('/config.json',{cache:'no-store'}).then(r=>r.json());}catch{}
-  config={...shared,...readConfig()};backend=new Backend(config);if(config.googleClientId)prepareGoogle().catch(()=>{});render();
+  config=mergeConfig(shared,readConfig());backend=new Backend(config);if(config.googleClientId)prepareGoogle().catch(()=>{});render();
   if('serviceWorker' in navigator)navigator.serviceWorker.getRegistrations().then(rs=>{for(const r of rs)if(r.active?.scriptURL.endsWith('/sw.js'))r.update();}).catch(()=>{});
   if(await backend.restore())await enter();
   try{portfolio=await backend.publicPortfolio()||emptyPortfolio();}catch{portfolio=emptyPortfolio();}render();

@@ -1,5 +1,5 @@
 import {describe,it,expect,vi,beforeEach} from 'vitest';
-import {Backend,writeConfig,googleConnected} from '../src/workspace/api.js';
+import {Backend,writeConfig,mergeConfig,googleConnected} from '../src/workspace/api.js';
 const owner='11111111-1111-1111-1111-111111111111';
 const config={url:'https://test.supabase.co',key:'sb_publishable_test',email:'owner@test.invalid',owner};
 const response=(body,status=200)=>({ok:status<400,status,json:async()=>body});
@@ -12,3 +12,5 @@ describe('private workspace boundary',()=>{
   it('requests only published portfolio anonymously with a publishable key',async()=>{const f=vi.spyOn(globalThis,'fetch').mockResolvedValue(response([{content:{name:'Public'}}]));const b=new Backend(config);expect((await b.publicPortfolio()).name).toBe('Public');expect(f.mock.calls[0][0]).toContain('/portfolio?');expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();});
   it('refuses service credentials in browser configuration',()=>{expect(()=>writeConfig({...config,key:'sb_secret_unsafe'})).toThrow('공개');expect(()=>writeConfig({...config,key:`a.${btoa(JSON.stringify({role:'service_role'}))}.b`})).toThrow('service_role');expect(googleConnected()).toBe(false);});
 });
+
+it('uses the deployed Google client ID when old browser settings have an empty value',()=>{expect(mergeConfig({...config,googleClientId:'published-id'}, {...config,googleClientId:'  '}).googleClientId).toBe('published-id');expect(mergeConfig({googleClientId:'published-id'},{googleClientId:'browser-id'}).googleClientId).toBe('browser-id');expect(mergeConfig({},{}).googleClientId).toBe('');});

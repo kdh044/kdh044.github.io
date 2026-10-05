@@ -7,6 +7,7 @@ export function writeConfig(c) {
   try{const payload=JSON.parse(atob(c.key.split('.')[1]));if(payload.role==='service_role')throw Error('secret');}catch(e){if(e.message==='secret')throw Error('service_role 키는 사용할 수 없습니다.');}
   if(!/^[0-9a-f-]{36}$/i.test(c.owner))throw Error('사용자 UID를 확인해주세요.');localStorage.setItem(CONFIG_KEY,JSON.stringify({...c,url:u.origin}));
 }
+export const mergeConfig=(shared={},local={})=>({...shared,...local,googleClientId:(typeof local.googleClientId==='string'&&local.googleClientId.trim())||shared.googleClientId||''});
 export const configured=c=>Boolean(c.url&&c.key&&c.email&&c.owner);
 export class Backend {
   constructor(c){this.config=c;this.session=null;this.revision=null;this.exists=false;this.epoch=0;}
