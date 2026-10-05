@@ -1,0 +1,14 @@
+import {describe,it,expect,vi,beforeEach} from 'vitest';
+import {Backend,writeConfig,googleConnected} from '../src/workspace/api.js';
+const owner='11111111-1111-1111-1111-111111111111';
+const config={url:'https://test.supabase.co',key:'sb_publishable_test',email:'owner@test.invalid',owner};
+const response=(body,status=200)=>({ok:status<400,status,json:async()=>body});
+beforeEach(()=>{sessionStorage.clear();localStorage.clear();vi.restoreAllMocks();});
+describe('private workspace boundary',()=>{
+  it('does not request private data before authenticating',async()=>{const b=new Backend(config);const f=vi.spyOn(globalThis,'fetch');await expect(b.load()).rejects.toThrow('로그인');expect(f).not.toHaveBeenCalled();});
+  it('rejects a valid session for a different user',async()=>{vi.spyOn(globalThis,'fetch').mockResolvedValue(response({user:{id:'another-user'},access_token:'token',expires_in:3600}));const b=new Backend(config);await expect(b.login('test-password')).rejects.toThrow('접근 권한');expect(b.session).toBeNull();expect(sessionStorage.length).toBe(0);});
+  it('uses the signed in token for private reads and removes it on logout',async()=>{const f=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(response({user:{id:owner},access_token:'token',refresh_token:'refresh',expires_in:3600})).mockResolvedValueOnce(response([{content:{tasks:[{title:'private'}]},revision:4}])).mockResolvedValueOnce(response(null));const b=new Backend(config);await b.login('test-password');expect((await b.load()).tasks[0].title).toBe('private');expect(f.mock.calls[1][1].headers.Authorization).toBe('Bearer token');await b.logout();expect(sessionStorage.length).toBe(0);await expect(b.load()).rejects.toThrow('로그인');});
+  it('retains current revision when another device wins the write',async()=>{const f=vi.spyOn(globalThis,'fetch').mockResolvedValue(response([]));const b=new Backend(config);b.setSession({user:{id:owner},access_token:'token',expires_in:3600});b.exists=true;b.revision=4;await expect(b.save({tasks:[]})).rejects.toThrow('다른 기기');expect(b.revision).toBe(4);expect(f.mock.calls[0][0]).toContain('revision=eq.4');});
+  it('requests only published portfolio anonymously with a publishable key',async()=>{const f=vi.spyOn(globalThis,'fetch').mockResolvedValue(response([{content:{name:'Public'}}]));const b=new Backend(config);expect((await b.publicPortfolio()).name).toBe('Public');expect(f.mock.calls[0][0]).toContain('/portfolio?');expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();});
+  it('refuses service credentials in browser configuration',()=>{expect(()=>writeConfig({...config,key:'sb_secret_unsafe'})).toThrow('공개');expect(()=>writeConfig({...config,key:`a.${btoa(JSON.stringify({role:'service_role'}))}.b`})).toThrow('service_role');expect(googleConnected()).toBe(false);});
+});
