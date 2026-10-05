@@ -17,3 +17,5 @@ it('clears an expired token and requires a fresh Google connection',async()=>{
   googleMock();await connectGoogle('123-test.apps.googleusercontent.com');const f=vi.spyOn(globalThis,'fetch').mockResolvedValue(response({error:{message:'expired'}},401));await expect(listGoogleEvents(new Date())).rejects.toThrow('만료');expect(googleConnected()).toBe(false);await expect(listGoogleEvents(new Date())).rejects.toThrow('다시 연결');expect(f).toHaveBeenCalledTimes(1);
 });
 it('does not establish a connection after declined consent',async()=>{googleMock({error:'access_denied'});await expect(connectGoogle('123-test.apps.googleusercontent.com')).rejects.toThrow('취소');expect(googleConnected()).toBe(false);});
+
+it('explains a deleted OAuth client without treating it as successful consent',async()=>{googleMock({error:'deleted_client'});await expect(connectGoogle('123-test.apps.googleusercontent.com')).rejects.toThrow('클라이언트가 삭제');expect(googleConnected()).toBe(false);});
