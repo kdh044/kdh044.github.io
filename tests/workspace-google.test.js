@@ -1,5 +1,5 @@
 import {it,expect,vi,afterEach} from 'vitest';
-import {connectGoogle,clearGoogle,googleConnected,listGoogleEvents,addGoogleEvent} from '../src/workspace/api.js';
+import {connectGoogle,clearGoogle,googleConnected,listGoogleCalendars,listGoogleEvents,googleEventKey,addGoogleEvent} from '../src/workspace/api.js';
 const response=(data,status=200)=>({ok:status<400,status,json:async()=>data});
 function googleMock(result={access_token:'google-test-token',expires_in:3600}){
   const requestAccessToken=vi.fn();window.google={accounts:{oauth2:{revoke:vi.fn(),initTokenClient:vi.fn(opts=>{requestAccessToken.mockImplementation(()=>opts.callback(result));return {requestAccessToken};})}}};return requestAccessToken;
@@ -19,3 +19,15 @@ it('clears an expired token and requires a fresh Google connection',async()=>{
 it('does not establish a connection after declined consent',async()=>{googleMock({error:'access_denied'});await expect(connectGoogle('123-test.apps.googleusercontent.com')).rejects.toThrow('취소');expect(googleConnected()).toBe(false);});
 
 it('explains a deleted OAuth client without treating it as successful consent',async()=>{googleMock({error:'deleted_client'});await expect(connectGoogle('123-test.apps.googleusercontent.com')).rejects.toThrow('클라이언트가 삭제');expect(googleConnected()).toBe(false);});
+
+it('requests calendar-list read permission without calendar management permission',async()=>{
+  googleMock();await connectGoogle('123-test.apps.googleusercontent.com');const options=window.google.accounts.oauth2.initTokenClient.mock.calls[0][0];expect(options.scope.split(' ')).toEqual(['https://www.googleapis.com/auth/calendar.events','https://www.googleapis.com/auth/calendar.calendarlist.readonly']);
+});
+it('lists shared and hidden calendars across pages and excludes deleted or busy-only calendars',async()=>{
+  googleMock();await connectGoogle('123-test.apps.googleusercontent.com');const f=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(response({items:[{id:'lab@group.calendar.google.com',summary:'Lab',accessRole:'reader',selected:true},{id:'busy',accessRole:'freeBusyReader'}],nextPageToken:'page2'})).mockResolvedValueOnce(response({items:[{id:'owner@test.invalid',primary:true,accessRole:'owner'},{id:'hidden',hidden:true,accessRole:'reader'},{id:'deleted',deleted:true,accessRole:'writer'}]}));
+  const list=await listGoogleCalendars();expect(list.map(c=>c.id)).toEqual(['owner@test.invalid','hidden','lab@group.calendar.google.com']);const q=new URL(f.mock.calls[0][0]).searchParams;expect(q.get('showHidden')).toBe('true');expect(q.get('minAccessRole')).toBe('reader');expect(new URL(f.mock.calls[1][0]).searchParams.get('pageToken')).toBe('page2');
+});
+it('reads each calendar by its own encoded ID and distinguishes identical event IDs',async()=>{
+  googleMock();await connectGoogle('123-test.apps.googleusercontent.com');const f=vi.spyOn(globalThis,'fetch').mockResolvedValue(response({items:[{id:'shared-event',summary:'Meeting'}]}));
+  const calendar={id:'lab/#?@group.calendar.google.com',summary:'Original',summaryOverride:'Lab',backgroundColor:'#123456'};const [lab]=await listGoogleEvents(new Date(),undefined,calendar);const [personal]=await listGoogleEvents(new Date());expect(new URL(f.mock.calls[0][0]).pathname).toContain(encodeURIComponent(calendar.id));expect(lab.calendarName).toBe('Lab');expect(lab.calendarColor).toBe('#123456');expect(lab.googleKey).not.toBe(personal.googleKey);expect(lab.googleKey).toBe(googleEventKey(calendar.id,'shared-event'));expect(lab.googleKey).not.toContain(':');
+});
