@@ -1,10 +1,14 @@
 import {it,expect,vi,afterEach} from 'vitest';
-import {connectGoogle,clearGoogle,googleConnected,listGoogleCalendars,listGoogleEvents,googleEventKey,addGoogleEvent} from '../src/workspace/api.js';
+import {connectGoogle,clearGoogle,googleConnected,listGoogleCalendars,listGoogleEvents,googleEventKey,addGoogleEvent,getGoogleEvent} from '../src/workspace/api.js';
 const response=(data,status=200)=>({ok:status<400,status,json:async()=>data});
 function googleMock(result={access_token:'google-test-token',expires_in:3600}){
   const requestAccessToken=vi.fn();window.google={accounts:{oauth2:{revoke:vi.fn(),initTokenClient:vi.fn(opts=>{requestAccessToken.mockImplementation(()=>opts.callback(result));return {requestAccessToken};})}}};return requestAccessToken;
 }
 afterEach(()=>{clearGoogle();delete window.google;vi.restoreAllMocks();});
+it('refreshes pinned events outside the visible month and handles cancellation without losing pins on temporary errors',async()=>{
+  googleMock();await connectGoogle('123-test.apps.googleusercontent.com');const key=googleEventKey('lab/#@group.calendar.google.com','event:one');const f=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(response({id:'event:one',summary:'Moved',start:{date:'2027-02-01'}})).mockResolvedValueOnce(response({status:'cancelled'})).mockResolvedValueOnce(response({error:{message:'gone'}},410)).mockResolvedValueOnce(response({error:{message:'permission'}},403));
+  expect((await getGoogleEvent(key)).summary).toBe('Moved');expect(f.mock.calls[0][0]).toContain('/calendars/'+encodeURIComponent('lab/#@group.calendar.google.com')+'/events/'+encodeURIComponent('event:one'));expect(await getGoogleEvent(key)).toBeNull();expect(await getGoogleEvent(key)).toBeNull();await expect(getGoogleEvent(key)).rejects.toThrow('permission');
+});
 it('reads the visible cross-month range and every page, omitting cancelled events',async()=>{
   sessionStorage.clear();localStorage.clear();const consent=googleMock();await connectGoogle('123-test.apps.googleusercontent.com');expect(consent).toHaveBeenCalledWith({prompt:'consent'});
   const f=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(response({items:[{id:'one'},{id:'cancelled',status:'cancelled'}],nextPageToken:'next'})).mockResolvedValueOnce(response({items:[{id:'two'}]}));

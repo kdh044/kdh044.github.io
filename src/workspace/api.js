@@ -50,13 +50,17 @@ export async function connectGoogle(clientId){
   if(!window.google?.accounts?.oauth2)await prepareGoogle();
   await new Promise((resolve,reject)=>{const client=window.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',include_granted_scopes:true,callback:r=>{if(r.error){reject(Error(r.error==='deleted_client'?'Google OAuth 클라이언트가 삭제되었습니다. 연결 설정의 Client ID를 확인해주세요.':'Google 캘린더 연결이 취소되었습니다.'));return;}googleToken=r.access_token;googleExpiry=Date.now()+r.expires_in*1000;resolve();},error_callback:()=>reject(Error('Google 로그인 창이 닫혔습니다.'))});client.requestAccessToken({prompt:'consent'});});
 }
-async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok){if(res.status===401){googleToken=null;googleExpiry=0;throw Error('Google 연결이 만료되었습니다. 다시 연결해주세요.');}throw Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');}return v;}
+async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok){if(res.status===401){googleToken=null;googleExpiry=0;throw Error('Google 연결이 만료되었습니다. 다시 연결해주세요.');}const err=new Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');err.status=res.status;throw err;}return v;}
 export async function listGoogleCalendars(){
   let calendars=[],next;
   do{const p=new URLSearchParams({minAccessRole:'reader',showHidden:'true',maxResults:'250',...(next?{pageToken:next}:{})});const r=await googleRequest('/users/me/calendarList?'+p);calendars.push(...(r.items||[]));next=r.nextPageToken;}while(next);
   return calendars.filter(c=>!c.deleted&&['owner','writer','writerWithoutPrivateAccess','reader'].includes(c.accessRole)).sort((a,b)=>Number(Boolean(b.primary))-Number(Boolean(a.primary))||(a.summaryOverride||a.summary||'').localeCompare(b.summaryOverride||b.summary||'','ko'));
 }
 export const googleEventKey=(calendarId,eventId)=>encodeURIComponent(JSON.stringify([calendarId,eventId]));
+export async function getGoogleEvent(key){
+  const pair=JSON.parse(decodeURIComponent(key));if(!Array.isArray(pair)||pair.length!==2||pair.some(x=>typeof x!=='string'||!x))throw Error('일정 ID를 확인해주세요.');
+  try{const e=await googleRequest('/calendars/'+encodeURIComponent(pair[0])+'/events/'+encodeURIComponent(pair[1]));return e.status==='cancelled'?null:{...e,googleKey:key};}catch(err){if([404,410].includes(err.status))return null;throw err;}
+}
 export async function listGoogleEvents(month,range,calendar={id:'primary'}){
   const start=range?.start||new Date(month.getFullYear(),month.getMonth(),1),end=range?.end||new Date(month.getFullYear(),month.getMonth()+1,1);let events=[],next;
   do{const p=new URLSearchParams({timeMin:start.toISOString(),timeMax:end.toISOString(),singleEvents:'true',orderBy:'startTime',maxResults:'2500',...(next?{pageToken:next}:{})});const r=await googleRequest('/calendars/'+encodeURIComponent(calendar.id)+'/events?'+p);events.push(...(r.items||[]));next=r.nextPageToken;}while(next);

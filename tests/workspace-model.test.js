@@ -5,7 +5,7 @@ it('starts without content and rejects script URLs',()=>{const w=emptyWorkspace(
 
 it('keeps a week contiguous across a year boundary without changing its anchor',()=>{const d=new Date(2027,0,1),days=weekCells(d);expect(days.map(dateKey)).toEqual(['2026-12-27','2026-12-28','2026-12-29','2026-12-30','2026-12-31','2027-01-01','2027-01-02']);expect(dateKey(d)).toBe('2027-01-01');});
 
-import {normalizeWorkspace,plannerWeek,weekKey,daysUntil,deadlineLabel} from '../src/workspace/model.js';
+import {normalizeWorkspace,plannerWeek,weekKey,daysUntil,deadlineLabel,monthDates,importantItems} from '../src/workspace/model.js';
 it('uses Monday weeks and handles deadlines as calendar days across leap years',()=>{
   expect(plannerWeek(new Date(2027,0,3)).map(dateKey)).toEqual(['2026-12-28','2026-12-29','2026-12-30','2026-12-31','2027-01-01','2027-01-02','2027-01-03']);
   expect(weekKey(new Date(2027,0,3))).toBe('2026-12-28');
@@ -14,6 +14,15 @@ it('uses Monday weeks and handles deadlines as calendar days across leap years',
   expect(deadlineLabel('2026-10-06','2026-10-06')).toBe('D-day');
   expect(deadlineLabel('2026-10-05','2026-10-06')).toBe('D+1');
   expect(daysUntil('2026-02-30','2026-02-28')).toBeNull();
+});
+it('uses exact month lengths and retains only valid habit checks',()=>{
+  expect(monthDates(new Date(2028,1,10))).toHaveLength(29);expect(monthDates(new Date(2027,1,10))).toHaveLength(28);
+  const w=normalizeWorkspace({habits:[{id:'h',title:'Habit',checks:{'2028-02-29':true,'2027-02-29':true,'2028-03-01':false}}]});expect(w.habits[0].checks).toEqual({'2028-02-29':true});expect(normalizeWorkspace(JSON.parse(JSON.stringify(w)))).toEqual(w);
+});
+it('derives D-days from important dates and updates Google pins from current events',()=>{
+  const w=emptyWorkspace();w.tasks=[{id:'t',title:'Task',date:'2026-10-09',important:true,status:'todo'},{id:'done',title:'Done',date:'2026-10-08',important:true,status:'done'}];w.events=[{id:'e',title:'Meeting',date:'2026-10-10',important:true}];w.googleImportant={'key':{title:'Old title',date:'2026-10-11'}};
+  expect(importantItems(w).map(x=>x.title)).toEqual(['Task','Meeting','Old title']);w.tasks[0].date='2026-10-12';expect(importantItems(w).find(x=>x.id==='t').date).toBe('2026-10-12');
+  const live=[{googleKey:'key',summary:'Moved meeting',start:{date:'2026-10-13'}}];expect(importantItems(w,live).find(x=>x.kind==='google')).toMatchObject({title:'Moved meeting',date:'2026-10-13'});expect(importantItems(w,[{...live[0],status:'cancelled'}]).some(x=>x.kind==='google')).toBe(false);
 });
 it('loads old workspaces without losing tasks and keeps new private plans across reloads',()=>{
   const old={tasks:[{id:'existing',title:'Keep',date:'2026-10-06'}],notes:{'2026-10-06':'Keep memo'}};
