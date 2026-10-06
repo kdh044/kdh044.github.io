@@ -11,7 +11,7 @@ export function mergeConfig(shared={},local={}) {
   const published=typeof shared.googleClientId==='string'?shared.googleClientId.trim():'';
   const browser=typeof local.googleClientId==='string'?local.googleClientId.trim():'';
   const deliberateOverride=local.googleBaseClientId===(published||'');
-  return {...shared,...local,googleClientId:published&&(!deliberateOverride||!browser)?published:(browser||published)};
+  return {...shared,...local,loginMode:shared.loginMode||local.loginMode||'password',googleClientId:published&&(!deliberateOverride||!browser)?published:(browser||published)};
 }
 export const configured=c=>Boolean(c.url&&c.key&&c.email&&c.owner);
 export class Backend {
@@ -23,7 +23,7 @@ export class Backend {
     const data=await res.json().catch(()=>null);if(!res.ok){const e=new Error(res.status===401?'로그인이 만료되었습니다. 다시 로그인해주세요.':data?.message||data?.error_description||'요청을 완료하지 못했습니다.');e.status=res.status;throw e;}return data;
   }
   setSession(s){if(s?.user?.id!==this.config.owner)throw Error('이 계정에는 접근 권한이 없습니다.');this.session={...s,expires_at:s.expires_at||Date.now()/1000+s.expires_in};sessionStorage.setItem(SESSION_KEY,JSON.stringify(this.session));}
-  async login(password){const s=await this.request('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email:this.config.email,password}});this.setSession(s);}
+  async login(password){const pinMode=this.config.loginMode==='pin';if(pinMode&&!/^\d{4}$/.test(password))throw Error('PIN 네 자리를 입력해주세요.');const epoch=this.epoch;const s=await this.request(pinMode?'/functions/v1/planner-login':'/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:pinMode?{pin:password}:{email:this.config.email,password}});if(epoch!==this.epoch)throw Error('로그아웃되었습니다.');this.setSession(s);}
   async refresh(){if(!this.session?.refresh_token)throw Error('다시 로그인해주세요.');const epoch=this.epoch;const s=await this.request('/auth/v1/token?grant_type=refresh_token',{method:'POST',auth:false,body:{refresh_token:this.session.refresh_token}});if(epoch!==this.epoch)throw Error('로그아웃되었습니다.');this.setSession(s);}
   async restore(){try{const s=JSON.parse(sessionStorage.getItem(SESSION_KEY));if(!s)return false;this.setSession(s);const u=await this.request('/auth/v1/user');if(u.id!==this.config.owner)throw Error('권한 없음');return true;}catch{this.clear();return false;}}
   clear(){this.epoch++;this.session=null;this.exists=false;this.revision=null;sessionStorage.removeItem(SESSION_KEY);}

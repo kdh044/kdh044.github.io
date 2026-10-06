@@ -27,6 +27,16 @@
 
 계정 연결 전에는 빈 포트폴리오 템플릿과 잠긴 플래너만 표시됩니다. 비밀번호를 HTML에서 비교하는 임시 잠금이나 로그인 우회는 없습니다.
 
+### 네 자리 PIN 로그인
+
+현재 배포 설정은 `loginMode: "pin"`입니다. PIN은 공개 설정·사이트 소스에 저장하지 않습니다. 서버의 private 스키마에 bcrypt 해시만 저장합니다. `planner-login` Edge Function이 서버에서 검증한 뒤 기존 소유자 계정의 Supabase 세션을 발급합니다. 메일은 보내지 않고, 기존 계정 비밀번호는 변경하지 않습니다.
+
+5회 실패하면 15분 동안 PIN 로그인이 잠깁니다. 제한은 계정 전체에 적용되므로 브라우저나 IP를 바꿔도 건너뛰지 못합니다. 잠긴 동안 이미 로그인된 세션의 작업은 유지됩니다.
+
+서버 구성은 `supabase/planner-pin-schema.sql`과 `supabase/functions/planner-login`에 있습니다. 공개 RPC의 실행 권한은 service_role만 가지며, PIN 표에는 방문자·로그인 사용자의 접근 권한이 없습니다. Edge Function은 사용자 세션이 생기기 전의 로그인 요청을 받기 때문에 `verify_jwt = false`이며, 함수 내부의 PIN 검증과 DB 시도 제한이 인증을 담당합니다. 관리자 키는 Supabase의 서버 환경 변수에서만 사용하고 반환하지 않습니다.
+
+PIN 변경은 관리자 권한으로 private 해시를 교체해야 합니다. 공개 저장소에 PIN이나 PIN 해시를 넣지 마세요.
+
 ## 2. Google Calendar
 
 1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 만들고 **Google Calendar API**를 활성화합니다.
