@@ -27,15 +27,18 @@ export class Backend {
   async refresh(){if(!this.session?.refresh_token)throw Error('다시 로그인해주세요.');const epoch=this.epoch;const s=await this.request('/auth/v1/token?grant_type=refresh_token',{method:'POST',auth:false,body:{refresh_token:this.session.refresh_token}});if(epoch!==this.epoch)throw Error('로그아웃되었습니다.');this.setSession(s);}
   async restore(){try{const s=JSON.parse(sessionStorage.getItem(SESSION_KEY));if(!s)return false;this.setSession(s);const u=await this.request('/auth/v1/user');if(u.id!==this.config.owner)throw Error('권한 없음');return true;}catch{this.clear();return false;}}
   clear(){this.epoch++;this.session=null;this.exists=false;this.revision=null;sessionStorage.removeItem(SESSION_KEY);}
-  async logout(){try{if(this.session)await this.request('/auth/v1/logout',{method:'POST'});}finally{this.clear();}}
+  async logout(){try{if(this.session)await this.request('/auth/v1/logout?scope=local',{method:'POST'});}finally{this.clear();}}
   async publicPortfolio(){if(!configured(this.config))return null;const rows=await this.request('/rest/v1/portfolio?id=eq.main&select=content',{auth:false});return rows?.[0]?.content||null;}
   async load(){const rows=await this.request(`/rest/v1/workspaces?owner_id=eq.${this.config.owner}&select=content,revision`);this.exists=Boolean(rows?.length);this.revision=rows?.[0]?.revision||0;return rows?.[0]?.content||null;}
   async save(content){const revision=this.revision+1;const rows=await this.request(`/rest/v1/workspaces${this.exists?`?owner_id=eq.${this.config.owner}&revision=eq.${this.revision}`:''}`,{method:this.exists?'PATCH':'POST',body:this.exists?{content,revision}:{owner_id:this.config.owner,content,revision},headers:{Prefer:'return=representation'}});if(!rows?.length)throw Error('다른 기기에서 변경되었습니다. 백업을 내보낸 후 새로고침해주세요.');this.exists=true;this.revision=revision;}
   async publish(content){await this.request('/rest/v1/portfolio?on_conflict=id',{method:'POST',body:{id:'main',owner_id:this.config.owner,content},headers:{Prefer:'resolution=merge-duplicates'}});}
 }
-let googleToken=null,googleExpiry=0,googleLoader=null;
-export const googleConnected=()=>Boolean(googleToken&&googleExpiry>Date.now());
-export function clearGoogle(){if(googleToken&&window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(googleToken,()=>{});googleToken=null;googleExpiry=0;}
+let googleToken=null,googleExpiry=0,googleLoader=null,googleBackend=null,persistentConnected=false;
+export const googleConnected=()=>persistentConnected||Boolean(googleToken&&googleExpiry>Date.now());
+export function clearGoogle(){if(googleToken&&window.google?.accounts?.oauth2)window.google.accounts.oauth2.revoke(googleToken,()=>{});googleToken=null;googleExpiry=0;googleBackend=null;persistentConnected=false;}
+export async function restoreGoogle(backend){const epoch=backend.epoch;const r=await backend.request('/functions/v1/planner-google',{method:'POST',body:{action:'status'}});if(epoch!==backend.epoch)return false;googleBackend=backend;persistentConnected=r.connected;return r.connected;}
+export async function disconnectGoogle(){if(googleBackend&&persistentConnected)await googleBackend.request('/functions/v1/planner-google',{method:'POST',body:{action:'disconnect'}});clearGoogle();}
+export async function syncGoogleWorkspace(){if(!googleBackend||!persistentConnected)return {pending:0,synced:0};try{return await googleBackend.request('/functions/v1/planner-google',{method:'POST',body:{action:'sync'}});}catch(e){if(e.status===428)persistentConnected=false;throw e;}}
 export function prepareGoogle(){
   if(window.google?.accounts?.oauth2)return Promise.resolve();
   if(!googleLoader)googleLoader=new Promise((resolve,reject)=>{
@@ -45,12 +48,16 @@ export function prepareGoogle(){
     s.onerror=()=>{clearTimeout(timer);s.remove();googleLoader=null;reject(Error('Google 로그인 도구를 불러오지 못했습니다.'));};document.head.append(s);
   });return googleLoader;
 }
-export async function connectGoogle(clientId){
+export async function connectGoogle(clientId,options={}){
   if(!clientId)throw Error('설정에서 Google OAuth Client ID를 입력해주세요.');
   if(!window.google?.accounts?.oauth2)await prepareGoogle();
+  if(options.backend){
+    const backend=options.backend,epoch=backend.epoch;
+    await new Promise((resolve,reject)=>{const client=window.google.accounts.oauth2.initCodeClient({client_id:clientId,scope:'openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',ux_mode:'popup',hint:options.email,include_granted_scopes:true,callback:async r=>{if(r.error||!r.code){reject(Error('Google 캘린더 승인이 취소되었습니다.'));return;}try{await backend.request('/functions/v1/planner-google',{method:'POST',body:{action:'connect',code:r.code},headers:{'X-Requested-With':'XmlHttpRequest'}});if(epoch!==backend.epoch)throw Error('로그아웃되었습니다.');googleBackend=backend;persistentConnected=true;resolve();}catch(e){reject(e);}},error_callback:()=>reject(Error('Google 로그인 창이 닫혔습니다.'))});client.requestCode();});return;
+  }
   await new Promise((resolve,reject)=>{const client=window.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',include_granted_scopes:true,callback:r=>{if(r.error){reject(Error(r.error==='deleted_client'?'Google OAuth 클라이언트가 삭제되었습니다. 연결 설정의 Client ID를 확인해주세요.':'Google 캘린더 연결이 취소되었습니다.'));return;}googleToken=r.access_token;googleExpiry=Date.now()+r.expires_in*1000;resolve();},error_callback:()=>reject(Error('Google 로그인 창이 닫혔습니다.'))});client.requestAccessToken({prompt:'consent'});});
 }
-async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok){if(res.status===401){googleToken=null;googleExpiry=0;throw Error('Google 연결이 만료되었습니다. 다시 연결해주세요.');}const err=new Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');err.status=res.status;throw err;}return v;}
+async function googleRequest(path,options={}){if(!googleConnected())throw Error('Google 캘린더를 다시 연결해주세요.');if(googleBackend&&persistentConnected){try{return await googleBackend.request('/functions/v1/planner-google',{method:'POST',body:{action:'request',path}});}catch(e){if(e.status===428)persistentConnected=false;throw e;}}const res=await fetch('https://www.googleapis.com/calendar/v3'+path,{...options,headers:{Authorization:`Bearer ${googleToken}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)});const v=await res.json().catch(()=>null);if(!res.ok){if(res.status===401){googleToken=null;googleExpiry=0;throw Error('Google 연결이 만료되었습니다. 다시 연결해주세요.');}const err=new Error(v?.error?.message||'Google 캘린더 요청이 실패했습니다.');err.status=res.status;throw err;}return v;}
 export async function listGoogleCalendars(){
   let calendars=[],next;
   do{const p=new URLSearchParams({minAccessRole:'reader',showHidden:'true',maxResults:'250',...(next?{pageToken:next}:{})});const r=await googleRequest('/users/me/calendarList?'+p);calendars.push(...(r.items||[]));next=r.nextPageToken;}while(next);

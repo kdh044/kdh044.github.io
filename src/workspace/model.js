@@ -18,7 +18,9 @@ export function daysUntil(target,today=dateKey()) {if(!validDateKey(target)||!va
 export function deadlineLabel(target,today=dateKey()) {const n=daysUntil(target,today);return n===null?'':n===0?'D-day':n>0?'D-'+n:'D+'+Math.abs(n);}
 
 export function monthDates(d=new Date()) {return Array.from({length:new Date(d.getFullYear(),d.getMonth()+1,0).getDate()},(_,i)=>dateKey(new Date(d.getFullYear(),d.getMonth(),i+1)));}
-export function normalizeHabits(habits) {return Array.isArray(habits)?habits.filter(h=>h&&typeof h.id==='string'&&typeof h.title==='string').map(h=>({id:h.id,title:h.title,checks:Object.fromEntries(Object.entries(h.checks&&typeof h.checks==='object'?h.checks:{}).filter(([key,value])=>validDateKey(key)&&value===true))})):[];}
+export const habitPalette=['#5b8a73','#6086b5','#9273b2','#c37c6c','#4f9697','#b69447','#be7392','#788699'];
+export const habitColor=(value,index=0)=>/^#[0-9a-f]{6}$/i.test(value||'')?value:habitPalette[index%habitPalette.length];
+export function normalizeHabits(habits) {return Array.isArray(habits)?habits.filter(h=>h&&typeof h.id==='string'&&typeof h.title==='string').map((h,index)=>({id:h.id,title:h.title,color:habitColor(h.color,index),checks:Object.fromEntries(Object.entries(h.checks&&typeof h.checks==='object'?h.checks:{}).filter(([key,value])=>validDateKey(key)&&value===true))})):[];}
 export const googleEventDate=e=>e.start?.date|| (e.start?.dateTime?dateKey(new Date(e.start.dateTime)):'');
 export function importantItems(w,google=[]) {
   const items=[];

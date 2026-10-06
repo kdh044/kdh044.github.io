@@ -4,5 +4,6 @@
   "email": "danny1321@jbnu.ac.kr",
   "owner": "e63815c9-ff91-4c68-a3ec-846603083849",
   "googleClientId": "559780297433-0fi3qu0r1ein13srpr2umhub4nj23fva.apps.googleusercontent.com",
-  "loginMode": "pin"
+  "loginMode": "pin",
+  "googlePersistent": true
 }

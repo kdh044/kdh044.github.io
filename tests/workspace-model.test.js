@@ -31,3 +31,5 @@ it('loads old workspaces without losing tasks and keeps new private plans across
   expect(normalizeWorkspace(JSON.parse(JSON.stringify(upgraded)))).toEqual(upgraded);
   const malformed=normalizeWorkspace({dailyPlans:{'2026-02-30':'Bad','2026-10-06':false},deadlines:[{id:'bad',title:'Bad',date:'no'}]});expect(malformed.dailyPlans).toEqual({});expect(malformed.deadlines).toEqual([]);
 });
+
+it('assigns distinct defaults to old habits and safely retains custom colors across reloads',()=>{const w=normalizeWorkspace({habits:[{id:'a',title:'A',checks:{}},{id:'b',title:'B',checks:{}},{id:'c',title:'C',color:'#8855aa',checks:{}},{id:'d',title:'D',color:'red;display:none',checks:{}}]});expect(w.habits[0].color).not.toBe(w.habits[1].color);expect(w.habits[2].color).toBe('#8855aa');expect(w.habits[3].color).toMatch(/^#[0-9a-f]{6}$/);expect(normalizeWorkspace(JSON.parse(JSON.stringify(w))).habits).toEqual(w.habits);});

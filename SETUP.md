@@ -39,14 +39,17 @@ PIN 변경은 관리자 권한으로 private 해시를 교체해야 합니다. �
 
 ## 2. Google Calendar
 
-1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 만들고 **Google Calendar API**를 활성화합니다.
-2. Google Auth Platform에서 동의 화면을 설정합니다. 개인 테스트용이면 테스트 사용자에 본인 Google 이메일을 추가합니다.
-3. OAuth 클라이언트를 **웹 애플리케이션** 유형으로 만듭니다.
-4. 승인된 JavaScript 원본에 `https://kdh044.github.io`를 추가합니다. 로컬 개발 시 `http://localhost:5173`도 추가합니다. 원본에 경로나 `#/planner`를 붙이지 않습니다.
-5. 로그인 후 **캘린더 → Google 연결**에서 Client ID를 입력하고 저장합니다. 설정은 이 브라우저에만 보관됩니다. 다른 기기에서도 같은 설정을 쓰려면 `public/config.json`의 `googleClientId`에 넣습니다. **Client secret은 필요 없고 입력할 곳도 없습니다.**
-6. 로그인 후 캘린더 → Google 연결에서 본인 계정을 승인합니다.
+현재 배포는 `googlePersistent: true`이며 `danny1321@jbnu.ac.kr` 계정에 연결하도록 구성했습니다. Google Calendar API와 웹 OAuth 클라이언트는 기존 구성을 사용합니다. 사이트 상단의 **Google 연결**을 눌러 학교 계정으로 한 번 승인하면, 플래너에 재로그인하거나 새로고침해도 서버의 갱신 토큰으로 연결을 복원합니다. 사이트 로그아웃은 Google 권한을 취소하지 않습니다. 캘린더의 **연결 해제**는 Google 권한을 취소하고 서버의 연결 정보를 제거합니다.
 
-연동 범위: 연결한 계정의 기본 캘린더와 공유·휴일 캘린더를 조회합니다. 캘린더 오른쪽의 **표시할 캘린더**에서 켜고 끌 수 있고, 캘린더 이름과 색상을 구분해 표시합니다. 첫 연결은 Google에서 선택된 캘린더와 기본 캘린더를 표시하며, 이후 선택은 비공개 워크스페이스에 저장합니다. 캘린더 목록을 읽는 `calendar.calendarlist.readonly` 권한이 추가되어 기존 사용자는 Google 연결을 다시 승인해야 합니다. Google Tasks는 별도 API이므로 이 연동에 포함되지 않습니다. 월·주 화면에 표시되는 날짜 범위의 일정을 읽고, 캘린더의 일정 입력란에서 ‘Google’을 체크한 새 일정을 Google의 기본 캘린더에 등록합니다. 수정·삭제는 일정 상세의 Google 캘린더 링크에서 처리합니다. 로컬 일정과 할 일은 자동으로 Google에 복사하지 않습니다. 기본 1시간 일정, 시간이 없으면 종일 일정입니다. Google 토큰은 메모리에만 보관하므로 새로고침하면 다시 연결합니다. 월·주 이동과 새로고침 버튼으로 최근 일정을 조회하며 백그라운드 양방향 실시간 동기화는 아닙니다.
+서버 구성은 `supabase/planner-google-schema.sql`과 `supabase/functions/planner-google`입니다. OAuth client secret과 refresh token은 Supabase Vault에 암호화해 저장합니다. 소스·공개 config·브라우저 저장소에는 넣지 않습니다. Edge Function은 매 요청마다 Supabase Auth에서 사용자를 검증하고 등록된 소유자만 허용합니다. `verify_jwt = false`를 사용하는 이유는 함수 안에서 실제 사용자 검증을 수행하기 때문입니다. 비밀정보 RPC는 service_role만 실행할 수 있으며 일반 로그인 사용자도 직접 호출할 수 없습니다.
+
+사이트의 일정과 날짜 있는 할 일은 DB 저장 후 Google **기본 캘린더**에 자동 반영합니다. 새 항목, 제목·날짜·시간 수정, 삭제가 반영됩니다. 할 일은 종일 일정으로 표시하며 미완료 `☐`, 완료 `✓`를 제목 앞에 붙입니다. 이는 Google Calendar의 일정이며 Google Tasks API의 할 일은 아닙니다. 날짜 미정 할 일, 메모, 하루·주간 계획의 자유 텍스트, 습관, 포트폴리오는 Google로 보내지 않습니다. 시간을 입력한 일정은 한국 시간 기준 1시간, 시간이 없으면 종일 일정입니다.
+
+사이트의 일간·주간·월간은 같은 작업·일정 데이터를 사용합니다. Google에 만든 복사본은 사이트 화면에서 중복 표시하지 않습니다. 사이트에서 만든 항목은 사이트에서 편집하며, 기존 Google 일정과 공유 연구실 일정은 Google의 원본을 읽어 보여줍니다. Google에서 사이트의 복사본을 수정한 내용이 로컬 작업으로 역수입되지는 않습니다. 선택된 공유·휴일 캘린더의 일정은 탭 이동, 새로고침 버튼, 사이트가 열린 동안 1분 간격으로 갱신됩니다. 브라우저를 닫은 동안 백그라운드 동기화는 실행하지 않습니다.
+
+Google 반영에 실패해도 사이트 저장 결과는 유지합니다. 상단의 **Google 재시도**로 다시 시도하거나, 권한이 만료된 경우 재승인하세요. 다음 로그인에서도 아직 반영되지 않은 변경을 다시 처리합니다. Google에 등록하는 ID는 소유자·항목 ID로 결정되므로 재시도로 같은 일정이 여러 개 생성되지 않습니다. 삭제는 이 사이트가 만든 복사본만 대상으로 하며 기존 연구실 일정은 삭제하지 않습니다.
+
+OAuth 동의 화면이 **테스트** 상태이면 Calendar 권한의 갱신 토큰은 Google 정책에 따라 7일 뒤 만료될 수 있습니다. 연결을 장기간 유지하려면 Google Auth Platform의 게시 상태를 프로덕션으로 전환해야 하며 계정·권한에 따라 추가 검증이 요구될 수 있습니다. 권한 취소, 학교 관리자의 정책 변경, Google 보안 요구가 있으면 재승인이 필요합니다. 승인된 JavaScript 원본은 `https://kdh044.github.io`이며 popup code 방식의 토큰 교환에서도 이 원본을 사용합니다.
 
 ## 3. 화면에서 편집
 
@@ -54,7 +57,8 @@ PIN 변경은 관리자 권한으로 private 해시를 교체해야 합니다. �
 - 오늘: 오늘과 지난 날짜의 할 일, 하루 계획, 오늘의 메모. 날짜가 없는 할 일도 표시됩니다.
 - 주간: 월요일–일요일의 할 일과 일주일 계획. 날짜별 + 버튼으로 추가한 할 일은 오늘·프로젝트·캘린더에서도 같은 항목을 사용합니다. 날짜가 오늘이 되면 오늘 화면에 나타납니다. 완료 상태와 편집도 함께 반영됩니다.
 - 계획: 날짜를 선택해 하루 계획과 해당 주의 일주일 계획을 작성합니다. 오늘·주간 입력란과 같은 내용을 사용하며 자동 저장됩니다.
-- D-day: 오늘·주간·계획 상단에서 중요한 일정의 남은 날짜를 확인합니다. 추가와 편집, 삭제는 화면에서 가능하며 당일은 D-day, 지난 날짜는 D+로 표시합니다.
+- D-day: 일정·할 일의 별표로 중요한 항목을 지정하면 상단에 남은 날짜가 자동 표시됩니다. 완료한 할 일은 제외됩니다.
+- 습관: 월별 날짜 칸을 체크하며, 습관 이름 옆 색상 칸에서 각 습관의 색을 선택합니다. 색상과 체크 이력은 비공개로 저장됩니다.
 - 프로젝트: 프로젝트 만들기, 작업 연결, 보드 드래그 또는 편집에서 상태 변경.
 - 페이지: 텍스트·제목·체크리스트·구분선·링크·이미지 블록. 드래그 또는 ↑/↓로 순서 변경. 이미지는 공개 이미지 URL 방식입니다.
 - 포트폴리오 편집: 이름·소개, 섹션 이름과 순서, 블록, 강조 색상·너비·커버. 초안은 비공개로 저장하고 **공개하기**를 눌러 게시합니다.
@@ -72,4 +76,4 @@ SQL 적용 후 아래 상황을 실제 계정으로 확인하세요.
 4. 공개 포트폴리오의 내용만 방문자에게 보이며 페이지·할 일·메모는 보이지 않는지 확인.
 5. Google 승인 후 월 일정 조회와 새 일정 등록 확인.
 
-참고: [Supabase 비밀번호 인증](https://supabase.com/docs/guides/auth/passwords), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Google OAuth 토큰 방식](https://developers.google.com/identity/oauth2/web/guides/use-token-model).
+참고: [Supabase 비밀번호 인증](https://supabase.com/docs/guides/auth/passwords), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Google OAuth 코드 방식](https://developers.google.com/identity/oauth2/web/guides/use-code-model).
