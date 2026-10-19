@@ -21,8 +21,9 @@ it('uses exact month lengths and retains only valid habit checks',()=>{
 });
 it('derives D-days from important dates and updates Google pins from current events',()=>{
   const w=emptyWorkspace();w.tasks=[{id:'t',title:'Task',date:'2026-10-09',important:true,status:'todo'},{id:'done',title:'Done',date:'2026-10-08',important:true,status:'done'}];w.events=[{id:'e',title:'Meeting',date:'2026-10-10',important:true}];w.googleImportant={'key':{title:'Old title',date:'2026-10-11'}};
-  expect(importantItems(w).map(x=>x.title)).toEqual(['Task','Meeting','Old title']);w.tasks[0].date='2026-10-12';expect(importantItems(w).find(x=>x.id==='t').date).toBe('2026-10-12');
-  const live=[{googleKey:'key',summary:'Moved meeting',start:{date:'2026-10-13'}}];expect(importantItems(w,live).find(x=>x.kind==='google')).toMatchObject({title:'Moved meeting',date:'2026-10-13'});expect(importantItems(w,[{...live[0],status:'cancelled'}]).some(x=>x.kind==='google')).toBe(false);
+  expect(importantItems(w,[],'2026-10-10').map(x=>x.title)).toEqual(['Meeting','Old title']);
+  expect(importantItems(w,[],'2026-10-09').map(x=>x.title)).toEqual(['Task','Meeting','Old title']);w.tasks[0].date='2026-10-12';expect(importantItems(w,[],'2026-10-09').find(x=>x.id==='t').date).toBe('2026-10-12');
+  const live=[{googleKey:'key',summary:'Moved meeting',start:{date:'2026-10-13'}}];expect(importantItems(w,live,'2026-10-09').find(x=>x.kind==='google')).toMatchObject({title:'Moved meeting',date:'2026-10-13'});expect(importantItems(w,[{...live[0],status:'cancelled'}],'2026-10-09').some(x=>x.kind==='google')).toBe(false);
 });
 it('loads old workspaces without losing tasks and keeps new private plans across reloads',()=>{
   const old={tasks:[{id:'existing',title:'Keep',date:'2026-10-06'}],notes:{'2026-10-06':'Keep memo'}};
