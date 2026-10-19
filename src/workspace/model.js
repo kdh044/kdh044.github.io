@@ -22,11 +22,11 @@ export const habitPalette=['#5b8a73','#6086b5','#9273b2','#c37c6c','#4f9697','#b
 export const habitColor=(value,index=0)=>/^#[0-9a-f]{6}$/i.test(value||'')?value:habitPalette[index%habitPalette.length];
 export function normalizeHabits(habits) {return Array.isArray(habits)?habits.filter(h=>h&&typeof h.id==='string'&&typeof h.title==='string').map((h,index)=>({id:h.id,title:h.title,color:habitColor(h.color,index),checks:Object.fromEntries(Object.entries(h.checks&&typeof h.checks==='object'?h.checks:{}).filter(([key,value])=>validDateKey(key)&&value===true))})):[];}
 export const googleEventDate=e=>e.start?.date|| (e.start?.dateTime?dateKey(new Date(e.start.dateTime)):'');
-export function importantItems(w,google=[]) {
+export function importantItems(w,google=[],today=dateKey()) {
   const items=[];
-  for(const [kind,list] of [['task',w.tasks],['event',w.events],['project',w.projects]])for(const x of list||[])if(x.important&&x.status!=='done'&&validDateKey(x.date)&&daysUntil(x.date)>=0)items.push({id:x.id,kind,title:x.title,date:x.date});
-  for(const [key,snapshot] of Object.entries(w.googleImportant||{})){const live=google.find(e=>(e.googleKey||e.id)===key);if(live?.status==='cancelled')continue;const date=live?googleEventDate(live):snapshot.date;if(validDateKey(date)&&daysUntil(date)>=0)items.push({id:key,kind:'google',title:live?.summary||snapshot.title,date});}
+  for(const [kind,list] of [['task',w.tasks],['event',w.events],['project',w.projects]])for(const x of list||[])if(x.important&&x.status!=='done'&&validDateKey(x.date)&&daysUntil(x.date,today)>=0)items.push({id:x.id,kind,title:x.title,date:x.date});
+  for(const [key,snapshot] of Object.entries(w.googleImportant||{})){const live=google.find(e=>(e.googleKey||e.id)===key);if(live?.status==='cancelled')continue;const date=live?googleEventDate(live):snapshot.date;if(validDateKey(date)&&daysUntil(date,today)>=0)items.push({id:key,kind:'google',title:live?.summary||snapshot.title,date});}
   // Retain existing D-days as important calendar entries; no second input list.
-  for(const x of w.deadlines||[])if(validDateKey(x.date)&&daysUntil(x.date)>=0&&!items.some(i=>i.kind==='event'&&i.id===x.id))items.push({...x,kind:'legacy'});
+  for(const x of w.deadlines||[])if(validDateKey(x.date)&&daysUntil(x.date,today)>=0&&!items.some(i=>i.kind==='event'&&i.id===x.id))items.push({...x,kind:'legacy'});
   return items.sort((a,b)=>{const x=daysUntil(a.date),y=daysUntil(b.date);return (x<0)-(y<0)||a.date.localeCompare(b.date);});
 }
