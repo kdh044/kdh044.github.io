@@ -1,0 +1,35 @@
+name: Supabase REST Keepalive
+
+on:
+  schedule:
+    # 09:17 KST every day (00:17 UTC).
+    - cron: '17 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Read public Supabase table through REST
+        shell: bash
+        env:
+          SUPABASE_URL: https://bklkxalljcidivbkfzrc.supabase.co
+          # A public, client-safe key; not a service_role or secret key.
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_3qAjGx9JFB9mEhoXkMF0Dg_mcaPjz8E
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            curl --fail-with-body --silent --show-error \
+              --retry 2 --retry-delay 3 --max-time 20 \
+              --get \
+              --data-urlencode 'select=*' \
+              --data-urlencode 'limit=1' \
+              --header "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+              "${SUPABASE_URL}/rest/v1/portfolio" >/dev/null
+            echo "Database read ${attempt}/3 succeeded."
+            if [ "$attempt" -lt 3 ]; then sleep 2; fi
+          done
